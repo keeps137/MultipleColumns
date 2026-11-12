@@ -1,0 +1,70 @@
+apply plugin: "java"
+
+sourceSets.main.java.srcDirs = ["src/"]
+
+repositories{
+    mavenCentral()
+    maven{ url 'https://www.jitpack.io' }
+    google()  // 安卓工具链（D8 用）
+}
+
+// 目标游戏版本：Mindustry v160.7（官方发布最新线，与你手机上的 Mindustry X 基底一致）
+// jitpack 对 v150+ 不再提供依赖包，因此直接下载官方发布 jar 作为编译依赖
+ext{
+    mindustryVer = "v160.7"
+    mindustryUrl = "https://github.com/Anuken/Mindustry/releases/download/v160.7/Mindustry.jar"
+}
+
+// 下载官方 jar 到 libs/（已存在则跳过）
+tasks.register("fetchDeps"){
+    outputs.file("libs/Mindustry.jar")
+    doLast{
+        def f = file("libs/Mindustry.jar")
+        if(!f.exists()){
+            f.parentFile.mkdirs()
+            new URL(mindustryUrl).withInputStream{ ins -> f.withOutputStream{ it << ins } }
+        }
+    }
+}
+
+configurations{ d8tool }
+
+compileJava{
+    dependsOn "fetchDeps"
+    options.release = 17
+    options.incremental = true
+    options.warnings = false
+    options.encoding = 'UTF-8'
+}
+
+dependencies{
+    compileOnly files("libs/Mindustry.jar")
+    d8tool "com.android.tools:r8:8.5.35"
+}
+
+// 安卓加载 Java 模组需要 classes.dex：用 D8 把字节码转成安卓格式，塞回模组 jar
+tasks.register("dexJar", JavaExec){
+    dependsOn jar
+    classpath = configurations.d8tool
+    mainClass = "com.android.tools.r8.D8"
+    doFirst{
+        def outDir = file("build/dexout")
+        outDir.deleteDir()
+        outDir.mkdirs()
+        setArgs(["--release", "--min-api", "26",
+                 "--output", outDir.absolutePath,
+                 jar.archiveFile.get().asFile.absolutePath])
+    }
+    doLast{
+        ant.zip(destfile: jar.archiveFile.get().asFile, update: true){
+            zipfileset(file: "build/dexout/classes.dex", fullpath: "classes.dex")
+        }
+    }
+}
+build.dependsOn dexJar
+
+jar{
+    from("mod.hjson")
+    from("sprites"){ into("sprites") }  // 必须指明目标目录，否则贴图会被平铺到 jar 根，游戏找不到
+    archiveFileName = "GhostLayerFixture.jar"
+}

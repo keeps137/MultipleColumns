@@ -1,0 +1,11 @@
+{
+  name: 幽灵层测试宿主
+  author: 希光
+  description: 幽灵层并行生产：给宿主叠加虚拟生产列，多批并行。每批一条虚拟账目，料/液/电/热四科目攒账→结清→批内只花账内→完工注销。无总闸门，出货带锁，超速等额继承。
+  version: 0.2.1
+  minGameVersion: 160
+  minGameVersionNote: 需要 v160 及以上
+  java: true
+  main: ghostfixture.GhostLayerMod
+  hidden: false
+}
